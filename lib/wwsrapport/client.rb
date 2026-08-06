@@ -50,6 +50,20 @@ module Wwsrapport
       get_json("/reports/#{escape(report_id)}/improvement-advice")
     end
 
+    def report_verification(report_id)
+      get_json("/reports/#{escape(report_id)}/verification")
+    end
+
+    def derive_bag_reference(bag_vbo_id)
+      validate_bag_vbo_id!(bag_vbo_id)
+      post_json("/registry/bag-reference", { bagVboId: bag_vbo_id })
+    end
+
+    def search_registry_by_bag(bag_vbo_id)
+      validate_bag_vbo_id!(bag_vbo_id)
+      post_json("/registry/search-by-bag", { bagVboId: bag_vbo_id })
+    end
+
     def documents(report_id)
       get_json("/reports/#{escape(report_id)}/documents")
     end
@@ -107,6 +121,10 @@ module Wwsrapport
     end
 
     private
+
+    def validate_bag_vbo_id!(value)
+      raise ArgumentError, "BAG verblijfsobject ID must contain exactly sixteen digits." unless value.to_s.match?(/\A[0-9]{16}\z/)
+    end
 
     def get_json(path, query: {})
       request_json("GET", path, query: query)

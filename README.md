@@ -2,6 +2,8 @@
 
 Official Ruby client for the WWSrapport Public API.
 
+`derive_bag_reference`, `search_registry_by_bag` and `report_verification` expose the Solana attestation flow. `Wwsrapport::WEBHOOK_EVENTS` contains all 27 supported event types.
+
 Use this SDK to create WWS reports, validate input, retrieve report JSON, download immutable PDF documents, recalculate a report with a chosen ruleset and manage webhooks.
 
 ## Installation
