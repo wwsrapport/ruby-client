@@ -6,5 +6,5 @@ require_relative "wwsrapport/webhooks"
 require_relative "wwsrapport/webhook_events"
 
 module Wwsrapport
-  VERSION = "0.2.0"
+  VERSION = "0.2.1"
 end

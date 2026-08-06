@@ -8,7 +8,7 @@ require "uri"
 module Wwsrapport
   class Client
     DEFAULT_BASE_URL = "https://wwsrapport.nl/v1"
-    CLIENT_HEADER = "wwsrapport-ruby-client/0.2.0"
+    CLIENT_HEADER = "wwsrapport-ruby-client/0.2.1"
 
     def initialize(api_key:, base_url: DEFAULT_BASE_URL, http: Net::HTTP)
       raise ArgumentError, "api_key is required" if api_key.to_s.strip.empty?
