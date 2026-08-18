@@ -8,14 +8,19 @@ require "uri"
 module Wwsrapport
   class Client
     DEFAULT_BASE_URL = "https://wwsrapport.nl/v1"
-    CLIENT_HEADER = "wwsrapport-ruby-client/0.2.1"
+    CLIENT_HEADER = "wwsrapport-ruby-client/0.3.0"
 
-    def initialize(api_key:, base_url: DEFAULT_BASE_URL, http: Net::HTTP)
-      raise ArgumentError, "api_key is required" if api_key.to_s.strip.empty?
+    def initialize(api_key: nil, oauth: nil, request_context: nil, base_url: DEFAULT_BASE_URL, http: Net::HTTP)
+      raise ArgumentError, "api_key or oauth client credentials are required" if api_key.to_s.strip.empty? && oauth.nil?
 
       @api_key = api_key
+      @oauth = oauth
+      @request_context = request_context || {}
       @base_url = base_url.to_s.sub(%r{/+\z}, "")
       @http = http
+      @token_mutex = Mutex.new
+      @access_token = nil
+      @token_expires_at = Time.at(0)
     end
 
     def prefill_property(address)
@@ -52,6 +57,37 @@ module Wwsrapport
 
     def report_verification(report_id)
       get_json("/reports/#{escape(report_id)}/verification")
+    end
+
+    def review_report(report_id, review, idempotency_key:)
+      post_json("/reports/#{escape(report_id)}/human-review", review, idempotency_key: idempotency_key)
+    end
+
+    def create_batch(input, idempotency_key:)
+      post_json("/batches", input, idempotency_key: idempotency_key)
+    end
+
+    def batch(id)
+      get_json("/batches/#{escape(id)}")
+    end
+
+    def retry_batch(id, idempotency_key:)
+      post_json("/batches/#{escape(id)}/retry", nil, idempotency_key: idempotency_key)
+    end
+
+    def request_tenant_export(idempotency_key:)
+      post_json("/exports", nil, idempotency_key: idempotency_key)
+    end
+
+    def tenant_export(id)
+      get_json("/exports/#{escape(id)}")
+    end
+
+    def tenant_export_download_url(id)
+      post_json("/exports/#{escape(id)}/download-url", nil)
+    end
+    def request_offboarding(requested_by_reference, reason: nil)
+      post_json("/offboarding", { confirmation: "REQUEST_OFFBOARDING", requested_by_reference: requested_by_reference, reason: reason })
     end
 
     def derive_bag_reference(bag_vbo_id)
@@ -159,8 +195,9 @@ module Wwsrapport
       klass = Net::HTTP.const_get(method.capitalize)
       request = klass.new(uri)
       request["Accept"] = accept
-      request["Authorization"] = "Bearer #{@api_key}"
+      request["Authorization"] = "Bearer #{bearer_token}"
       request["X-WWSrapport-Client"] = CLIENT_HEADER
+      context_headers.each { |name, value| request[name] = value }
       request["Idempotency-Key"] = idempotency_key if idempotency_key
 
       unless body.nil?
@@ -169,6 +206,35 @@ module Wwsrapport
       end
 
       request
+    end
+
+    def bearer_token
+      return @api_key unless @api_key.to_s.strip.empty?
+
+      @token_mutex.synchronize do
+        return @access_token if @access_token && Time.now + 30 < @token_expires_at
+
+        token_uri = URI(@oauth[:token_url] || "#{URI(@base_url).scheme}://#{URI(@base_url).host}#{URI(@base_url).port == 443 ? '' : ":#{URI(@base_url).port}"}/oauth/token")
+        token_request = Net::HTTP::Post.new(token_uri)
+        token_request.basic_auth(@oauth.fetch(:client_id), @oauth.fetch(:client_secret))
+        token_request["Accept"] = "application/json"
+        token_request.set_form_data(grant_type: "client_credentials", scope: Array(@oauth[:scopes]).join(" "))
+        response = @http.start(token_uri.hostname, token_uri.port, use_ssl: token_uri.scheme == "https") { |connection| connection.request(token_request) }
+        raise Error.from_response(response) unless response.is_a?(Net::HTTPSuccess)
+        payload = JSON.parse(response.body)
+        @access_token = payload.fetch("access_token")
+        @token_expires_at = Time.now + payload.fetch("expires_in", 300).to_i
+        @access_token
+      end
+    end
+
+    def context_headers
+      {
+        "X-WWS-Municipality-Code" => @request_context[:municipality_code],
+        "X-WWS-Purpose-Code" => @request_context[:purpose_code],
+        "X-WWS-Case-Reference" => @request_context[:case_reference],
+        "X-WWS-Client-Reference" => @request_context[:client_reference]
+      }.reject { |_name, value| value.to_s.strip.empty? }
     end
 
     def uri_for(path, query)

@@ -6,6 +6,10 @@ Official Ruby client for the WWSrapport Public API.
 
 Use this SDK to create WWS reports, validate input, retrieve report JSON, download immutable PDF documents, recalculate a report with a chosen ruleset and manage webhooks.
 
+Version 0.3 also supports OAuth 2.0 client credentials, municipality/purpose/case
+request context, batch jobs, human review, tenant exports and controlled offboarding.
+Existing API-key integrations remain compatible.
+
 ## Installation
 
 Add this line to your Gemfile:
@@ -103,6 +107,10 @@ Webhook signatures are HMAC-SHA256 values over:
 - `POST /v1/webhooks/{id}/test`
 - `GET /v1/webhooks/{id}/deliveries`
 - `POST /v1/webhooks/{id}/deliveries/{delivery_id}/retry`
+- `POST /v1/batches` and `GET /v1/batches/{id}`
+- `POST /v1/reports/{id}/human-review`
+- `POST /v1/exports` and `GET /v1/exports/{id}`
+- `POST /v1/offboarding`
 
 ## Links
 
